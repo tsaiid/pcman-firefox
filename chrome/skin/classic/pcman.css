@@ -1,8 +1,8 @@
 #topwin {
-  -moz-appearance: none; 
+  -moz-appearance: none;
   background-color:#000;
 }
-#canvas {background-color:#000;}
+#canvas {background-color:#000; position:fixed; top: 0;}
 #box3 {position:fixed; top:-100px; background:#fff;}
 #input_proxy {-moz-appearance:none; position:fixed; border:none; opacity:.9; background-color:-moz-field; color:-moz-fieldtext; padding:0; margin:0;}
 

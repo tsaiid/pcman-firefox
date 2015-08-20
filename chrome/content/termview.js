@@ -358,30 +358,53 @@ TermView.prototype={
         var m=ctx.measureText('　'); //全形空白
         this.chw=Math.round(m.width/2);
 
+        // Handle about device pixel ratio
+        // ref: http://www.html5rocks.com/en/tutorials/canvas/hidpi/
+        devicePixelRatio = window.devicePixelRatio || 1,
+        backingStoreRatio = ctx.webkitBackingStorePixelRatio ||
+                            ctx.mozBackingStorePixelRatio ||
+                            ctx.msBackingStorePixelRatio ||
+                            ctx.oBackingStorePixelRatio ||
+                            ctx.backingStorePixelRatio || 1,
+        ratio = devicePixelRatio / backingStoreRatio;
+
         // if overflow, resize canvas again
         var overflowX = (this.chw * cols) - win.clientWidth;
         if(overflowX > 0) {
-          this.canvas.width = win.clientWidth;
-          this.chw = Math.floor(this.canvas.width / cols);
+          this.canvas.width = win.clientWidth * ratio;
+          this.canvas.style.width = win.clientWidth + 'px';
+          this.chw = Math.floor(win.clientWidth / cols);
           this.chh = this.chw*2;  // is it necessary to measureText?
           font = this.chh + 'px monospace';
           ctx.font= font;
-          this.canvas.height = this.chh * rows;
+          this.canvas.height = this.chh * rows * ratio;
+          this.canvas.style.height = this.chh * rows + 'px';
         }
 
         if(this.buf) {
-            this.canvas.width = this.chw * cols;
+            canvas_width = this.chw * this.buf.cols;
+            this.canvas.width = canvas_width * ratio;
+            this.canvas.style.width = canvas_width + 'px';
+            this.canvas.height = win.clientHeight * ratio;
+            this.canvas.style.height = win.clientHeight + 'px';
             // font needs to be reset after resizing canvas
             ctx.font= font;
             ctx.textBaseline='top';
+            ctx.scale(ratio, ratio);    // for HiDPI display
+            this.canvas.style.left = ((win.clientWidth - canvas_width) / 2) + 'px';
             this.redraw(true);
         }
         else {
             // dump(this.chw + ', ' + this.chw * 80 + '\n');
-            this.canvas.width = this.chw * cols;
+            canvas_width = this.chw * cols;
+            this.canvas.width = canvas_width * ratio;
+            this.canvas.style.width = canvas_width + 'px';
+            this.canvas.height = win.clientHeight * ratio;
+            this.canvas.style.height = win.clientHeight + 'px';
             // font needs to be reset after resizing canvas
             ctx.font= font;
             ctx.textBaseline='top';
+            this.canvas.style.left = ((win.clientWidth - canvas_width) / 2) + 'px';
         }
 
         var visible=this.cursorVisible;
