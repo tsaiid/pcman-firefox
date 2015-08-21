@@ -4,7 +4,12 @@ function PCManOptions() {
     this.setupDefault = PrefDefaults;
     this.useLoginMgr = PrefLoginMgr;
     this.isFX3 = this.getVersion();
-    this.load();
+    var _this = this;
+    this.promise = new Promise(function(resolve, reject) {
+        _this.load().then(function onFulfill() {
+            resolve();
+        });
+    });
 }
 
 PCManOptions.prototype = {
@@ -21,33 +26,41 @@ PCManOptions.prototype = {
 
     load: function() {
         this.groups = [];
-        this.prefService(false); // read preferences
-        // repair the default group
-        if(!this.groups[0]) {
-            this.copyGroup(0, null, '_override_');
-        } else if(this.groups[0].Name != this.setupDefault.Name) {
-            this.groups.unshift({});
-            this.copyGroup(0, null, '_override_');
-        }
-        for(var i=this.groups.length-1; i>=0; --i) {
-            // remove the empty group
-            if(!this.groups[i]) {
-                this.removeGroup(i);
-                continue;
-            }
-            // repair the references
-            for(var key in this.setupDefault) {
-                if(typeof(this.groups[i][key]) == "undefined")
-                    this.setVal(i, key, this.setupDefault[key]);
-            }
-        }
-        this.setLoginInfo(true);
+        var _this = this;
+        var promise = new Promise(function(resolve, reject) {
+            _this.prefService(false).then(function onFulfill() {  // read preferences
+                // repair the default group
+                if(!_this.groups[0]) {
+                    _this.copyGroup(0, null, '_override_');
+                } else if(_this.groups[0].Name != _this.setupDefault.Name) {
+                    _this.groups.unshift({});
+                    _this.copyGroup(0, null, '_override_');
+                }
+                for(var i=_this.groups.length-1; i>=0; --i) {
+                    // remove the empty group
+                    if(!_this.groups[i]) {
+                        _this.removeGroup(i);
+                        continue;
+                    }
+                    // repair the references
+                    for(var key in _this.setupDefault) {
+                        if(typeof(_this.groups[i][key]) == "undefined")
+                            _this.setVal(i, key, _this.setupDefault[key]);
+                    }
+                }
+                _this.setLoginInfo(true);
+                resolve();
+            });
+        });
+        return promise;
     },
 
     save: function() {
         this.setLoginInfo(false);
-        this.prefService(true); // write preferences
-        this.setLoginInfo(true);
+        var _this = this;
+        this.prefService(true).then(function onFulfill() { // write preferences
+            _this.setLoginInfo(true);
+        });
     },
 
     getGroupNames: function() {
@@ -118,75 +131,77 @@ PCManOptions.prototype = {
     // Read or write the content preferences
 
     prefService: function(isWrite) {
-        var prefService2 = Components.classes["@mozilla.org/content-pref/service;1"]
-                           .getService(Components.interfaces.nsIContentPrefService2);
         var _this = this;
-        var getURI = function(group) { // Only used in this function
-            if(group == _this.setupDefault.Name)
-                return null;
-            try {
-                var uri = Components.classes['@mozilla.org/network/io-service;1']
-                          .getService(Components.interfaces.nsIIOService)
-                          .newURI('telnet://'+group, null, null);
-                return _this.isFX3 ? uri : uri.hostPort;
-            } catch (e) { // incorrect group
-                return null;
-            }
-        };
-        var groupURIs = [null];
-        prefService2.getByName('Name', null, {
-            handleResult: function(pref) {
-                var groupName = pref.domain;
-                var uri = getURI(groupName);
-                if(groupName && uri)
-                    groupURIs.push(uri);
-            },
-            handleCompletion: function() {
-                if(!isWrite) { // read
-                    for(var i=0; i < groupURIs.length; ++i) {
-                        if (groupURIs[i]) {
-                            for(var key in _this.setupDefault) {
-                                var pref = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
-                                if (pref) {
-                                    _this.setVal(i, key, pref.value);
-                                    console.log("pref.value: " + pref.value);
-                                }
-                            }
-                        }
-                    }
-                } else {  // write
-                    for(var i=0; i < _this.groups.length; ++i) {
-                        if(groupURIs.join(', ').indexOf(_this.groups[i].Name) < 0)
-                            groupURIs.push(getURI(_this.groups[i].Name)); // new groups
-                    }
-                    for(var i=0; i < groupURIs.length; ++i) {
-                        if (groupURIs[i]) {
-                            for(var key in _this.setupDefault) {
-                                var groupName = groupURIs[i];
-                                if(_this.isFX3 && groupName)
-                                    groupName = groupName.hostPort;
-                                var newVal = null;
-                                if(!groupName || _this.findGroup(groupName)>0)
-                                    newVal = _this.getVal(_this.findGroup(groupName), key);
-                                var orgVal = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
-                                if(orgVal) {
-                                    if(newVal == orgVal.value) // not changed
-                                        continue;
-                                    if(newVal == null)
-                                        prefService2.removeByDomainAndName(groupURIs[i], key, null);
-                                    else
-                                        prefService2.set(groupURIs[i], key, newVal, null);
-                                } else {
-                                    if(newVal != null)
-                                        prefService2.set(groupURIs[i], key, newVal, null);
-                                }
-                            }
-                        }
-                    }
-
+        var promise = new Promise(function(resolve, reject) {
+            var prefService2 = Components.classes["@mozilla.org/content-pref/service;1"]
+                               .getService(Components.interfaces.nsIContentPrefService2);
+            var getURI = function(group) { // Only used in this function
+                if(group == _this.setupDefault.Name)
+                    return null;
+                try {
+                    var uri = Components.classes['@mozilla.org/network/io-service;1']
+                              .getService(Components.interfaces.nsIIOService)
+                              .newURI('telnet://'+group, null, null);
+                    return _this.isFX3 ? uri : uri.hostPort;
+                } catch (e) { // incorrect group
+                    return null;
                 }
-            }
+            };
+            var groupURIs = [null];
+            prefService2.getByName('Name', null, {
+                handleResult: function(pref) {
+                    var groupName = pref.domain;
+                    var uri = getURI(groupName);
+                    if(groupName && uri)
+                        groupURIs.push(uri);
+                },
+                handleCompletion: function() {
+                    if(!isWrite) { // read
+                        for(var i=0; i < groupURIs.length; ++i) {
+                            if (groupURIs[i]) {
+                                for(var key in _this.setupDefault) {
+                                    var pref = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
+                                    if (pref) {
+                                        _this.setVal(i, key, pref.value);
+                                    }
+                                }
+                            }
+                        }
+                    } else {  // write
+                        for(var i=0; i < _this.groups.length; ++i) {
+                            if(groupURIs.join(', ').indexOf(_this.groups[i].Name) < 0)
+                                groupURIs.push(getURI(_this.groups[i].Name)); // new groups
+                        }
+                        for(var i=0; i < groupURIs.length; ++i) {
+                            if (groupURIs[i]) {
+                                for(var key in _this.setupDefault) {
+                                    var groupName = groupURIs[i];
+                                    if(_this.isFX3 && groupName)
+                                        groupName = groupName.hostPort;
+                                    var newVal = null;
+                                    if(!groupName || _this.findGroup(groupName)>0)
+                                        newVal = _this.getVal(_this.findGroup(groupName), key);
+                                    var orgVal = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
+                                    if(orgVal) {
+                                        if(newVal == orgVal.value) // not changed
+                                            continue;
+                                        if(newVal == null)
+                                            prefService2.removeByDomainAndName(groupURIs[i], key, null);
+                                        else
+                                            prefService2.set(groupURIs[i], key, newVal, null);
+                                    } else {
+                                        if(newVal != null)
+                                            prefService2.set(groupURIs[i], key, newVal, null);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    resolve();
+                }
+            });
         });
+        return promise;
     },
 
     // Observer for the changes of the prefs

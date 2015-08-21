@@ -74,10 +74,12 @@ function updateSiteList() {
 function load() {
     href = window.arguments ? window.arguments[0] : null;
     options = new PCManOptions();
-    recentGroup = options.findGroup(href);
-    loadObject();
-    updattingSiteList = false;
-    updateSiteList();
+    options.promise.then(function onFulfill() {
+        recentGroup = options.findGroup(href);
+        loadObject();
+        updattingSiteList = false;
+        updateSiteList();
+    });
 }
 
 // Change the content of prefwindow to that of another group
