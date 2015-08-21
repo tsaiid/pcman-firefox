@@ -160,10 +160,15 @@ PCManOptions.prototype = {
                         for(var i=0; i < groupURIs.length; ++i) {
                             if (groupURIs[i]) {
                                 for(var key in _this.setupDefault) {
-                                    var pref = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
-                                    if (pref) {
-                                        _this.setVal(i, key, pref.value);
-                                    }
+                                    prefService2.getByDomainAndName(groupURIs[i], key, null, {
+                                        handleResult: function(pref) {
+                                            _this.setVal(groupURIs.indexOf(pref.domain), pref.name, pref.value);
+                                            //console.log("i = " + groupURIs.indexOf(pref.domain) + "; key = " + pref.name + "; val = " + pref.value);
+                                        },
+                                        handleCompletion: function() {
+                                            resolve();
+                                        }
+                                    });
                                 }
                             }
                         }
@@ -187,17 +192,21 @@ PCManOptions.prototype = {
                                             continue;
                                         if(newVal == null)
                                             prefService2.removeByDomainAndName(groupURIs[i], key, null);
-                                        else
+                                        else {
                                             prefService2.set(groupURIs[i], key, newVal, null);
+                                            console.log("domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal + "; orgVal: " + orgVal.value);
+                                        }
                                     } else {
-                                        if(newVal != null)
+                                        if(newVal != null) {
                                             prefService2.set(groupURIs[i], key, newVal, null);
+                                            console.log("domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal);
+                                        }
                                     }
                                 }
                             }
                         }
+                        resolve();
                     }
-                    resolve();
                 }
             });
         });
