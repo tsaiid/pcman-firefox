@@ -78,7 +78,7 @@ AnsiFile.prototype = {
 
         var foStream = Components.classes["@mozilla.org/network/file-output-stream;1"]
                                  .createInstance(Components.interfaces.nsIFileOutputStream);
-        foStream.init(fp.file, 0x02 | 0x08 | 0x20, 0666, 0);
+        foStream.init(fp.file, parseInt("0x02", 16) | parseInt("0x08", 16) | parseInt("0x20", 16), parseInt("0666", 8), 0);
         foStream.write(data, data.length);
         if (foStream instanceof Components.interfaces.nsISafeOutputStream)
             foStream.finish();
