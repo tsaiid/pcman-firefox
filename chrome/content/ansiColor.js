@@ -68,9 +68,9 @@ AnsiColor.prototype = {
             trans.getTransferData("text/unicode", data, len);
             if(!data || !data.value)
                 return "";
-            var text=data.value.QueryInterface(Components.interfaces.nsISupportsString);
-            text = text.data.substring(0, len.value / 2);
-            return text;
+            var clipboard_text=data.value.QueryInterface(Components.interfaces.nsISupportsString);
+            clipboard_text = clipboard_text.data.substring(0, len.value / 2);
+            return clipboard_text;
         }
     },
 

@@ -40,7 +40,7 @@ TermSel.prototype={
     selUpdate: function(col, row) {
         this.realEndCol = col;
         this.realEndRow = row;
-        var col1, col2, row1, row2, col, row;
+        var col1, col2, row1, row2;
 
         // swap start and end points to kept them in correct order
         if(this.realEndRow == this.realStartRow) { // only one line is selected
