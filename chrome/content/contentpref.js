@@ -118,8 +118,8 @@ PCManOptions.prototype = {
     // Read or write the content preferences
 
     prefService: function(isWrite) {
-        var prefService = Components.classes["@mozilla.org/content-pref/service;1"]
-                           .getService(Components.interfaces.nsIContentPrefService);
+        var prefService2 = Components.classes["@mozilla.org/content-pref/service;1"]
+                           .getService(Components.interfaces.nsIContentPrefService2);
         var _this = this;
         var getURI = function(group) { // Only used in this function
             if(group == _this.setupDefault.Name)
@@ -134,59 +134,66 @@ PCManOptions.prototype = {
             }
         };
         var groupURIs = [null];
-        var groupedPrefs = prefService.getPrefsByName('Name', null);
-        var enumerator = groupedPrefs.enumerator;
-        while(enumerator.hasMoreElements()) {
-            var property = enumerator.getNext()
-                          .QueryInterface(Components.interfaces.nsIProperty);
-            var groupName = property.name;
-            if(groupName && getURI(groupName))
-                groupURIs.push(getURI(groupName));
-        }
-        if(!isWrite) { // read
-            for(var i=0; i<groupURIs.length; ++i) {
-                for(var key in this.setupDefault) {
-                    if(!prefService.hasPref(groupURIs[i], key, null))
-                        continue;
-                    this.setVal(i, key, prefService.getPref(groupURIs[i], key, null));
+        prefService2.getByName('Name', null, {
+            handleResult: function(pref) {
+                var groupName = pref.domain;
+                var uri = getURI(groupName);
+                if(groupName && uri)
+                    groupURIs.push(uri);
+            },
+            handleCompletion: function() {
+                if(!isWrite) { // read
+                    for(var i=0; i < groupURIs.length; ++i) {
+                        if (groupURIs[i]) {
+                            for(var key in _this.setupDefault) {
+                                var pref = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
+                                if (pref) {
+                                    _this.setVal(i, key, pref.value);
+                                    console.log("pref.value: " + pref.value);
+                                }
+                            }
+                        }
+                    }
+                } else {  // write
+                    for(var i=0; i < _this.groups.length; ++i) {
+                        if(groupURIs.join(', ').indexOf(_this.groups[i].Name) < 0)
+                            groupURIs.push(getURI(_this.groups[i].Name)); // new groups
+                    }
+                    for(var i=0; i < groupURIs.length; ++i) {
+                        if (groupURIs[i]) {
+                            for(var key in _this.setupDefault) {
+                                var groupName = groupURIs[i];
+                                if(_this.isFX3 && groupName)
+                                    groupName = groupName.hostPort;
+                                var newVal = null;
+                                if(!groupName || _this.findGroup(groupName)>0)
+                                    newVal = _this.getVal(_this.findGroup(groupName), key);
+                                var orgVal = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
+                                if(orgVal) {
+                                    if(newVal == orgVal.value) // not changed
+                                        continue;
+                                    if(newVal == null)
+                                        prefService2.removeByDomainAndName(groupURIs[i], key, null);
+                                    else
+                                        prefService2.set(groupURIs[i], key, newVal, null);
+                                } else {
+                                    if(newVal != null)
+                                        prefService2.set(groupURIs[i], key, newVal, null);
+                                }
+                            }
+                        }
+                    }
+
                 }
             }
-            return;
-        }
-        // write
-        for(var i=0; i<this.groups.length; ++i) {
-            if(groupURIs.join(', ').indexOf(this.groups[i].Name) < 0)
-                groupURIs.push(getURI(this.groups[i].Name)); // new groups
-        }
-        for(var i=0; i<groupURIs.length; ++i) {
-            for(var key in this.setupDefault) {
-                var groupName = groupURIs[i];
-                if(this.isFX3 && groupName)
-                    groupName = groupName.hostPort;
-                var newVal = null;
-                if(!groupName || this.findGroup(groupName)>0)
-                    newVal = this.getVal(this.findGroup(groupName), key);
-                if(prefService.hasPref(groupURIs[i], key, null)) {
-                    var orgVal = prefService.getPref(groupURIs[i], key, null);
-                    if(newVal == orgVal) // not changed
-                        continue;
-                    if(newVal == null)
-                        prefService.removePref(groupURIs[i], key, null);
-                    else
-                        prefService.setPref(groupURIs[i], key, newVal, null);
-                } else {
-                    if(newVal != null)
-                        prefService.setPref(groupURIs[i], key, newVal, null);
-                }
-            }
-        }
+        });
     },
 
     // Observer for the changes of the prefs
 
     addObserver: function(url, prefHandler) {
-        var prefService = Components.classes["@mozilla.org/content-pref/service;1"]
-                           .getService(Components.interfaces.nsIContentPrefService);
+        var prefService2 = Components.classes["@mozilla.org/content-pref/service;1"]
+                           .getService(Components.interfaces.nsIContentPrefService2);
 
         // reduce the call of sync
         var _this = this;
@@ -212,17 +219,17 @@ PCManOptions.prototype = {
             }
         }
         for(var key in this.setupDefault)
-            prefService.addObserver(key, prefHandler.handler);
+            prefService2.addObserverForName(key, prefHandler.handler);
         // the observer for the username and the password doesn't work here.
         // is it necessary observe the changes immediately?
         // https://developer.mozilla.org/en/Observer_Notifications#Login_Manager
     },
 
     removeObserver: function(prefHandler) {
-        var prefService = Components.classes["@mozilla.org/content-pref/service;1"]
-                           .getService(Components.interfaces.nsIContentPrefService);
+        var prefService2 = Components.classes["@mozilla.org/content-pref/service;1"]
+                           .getService(Components.interfaces.nsIContentPrefService2);
         for(var key in this.setupDefault)
-            prefService.removeObserver(key, prefHandler.handler);
+            prefService2.removeObserverForName(key, prefHandler.handler);
     },
 
     sync: function(url, prefHandler) {
