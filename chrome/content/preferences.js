@@ -78,7 +78,7 @@ function load() {
     options = new PCManOptions();
     options.promise.then(function onFulfill() {
         console.log("load options.promise.then");
-        recentGroup = options.findGroup(href);
+        recentGroup = options.findGroup(href) > -1 ? options.findGroup(href) : 0;
         loadObject();
         updattingSiteList = false;
         updateSiteList();
