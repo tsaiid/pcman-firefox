@@ -4,16 +4,16 @@ function getVersion(app) {
     //var app = Components.classes["@mozilla.org/fuel/application;1"]
     //                    .getService(Components.interfaces.fuelIApplication);
     if(app.extensions) { // for firefox 3.x
-        document.getElementById('addonID').value = 
+        document.getElementById('addonID').value =
             app.extensions.get('pcmanfx2@pcman.org').name;
-        document.getElementById('version').value = 
+        document.getElementById('version').value =
             app.extensions.get('pcmanfx2@pcman.org').version;
     } else { // for firefox 4+
         //FIXME: get return value from this asynchronous function
         app.getExtensions(function(extensions) {
-            document.getElementById('addonID').value = 
+            document.getElementById('addonID').value =
                 extensions.get('pcmanfx2@pcman.org').name;
-            document.getElementById('version').value = 
+            document.getElementById('version').value =
                 extensions.get('pcmanfx2@pcman.org').version;
         });
     }
@@ -57,6 +57,8 @@ function updateSiteList() {
         siteList.removeItemAt(1);
 
     var groupNames = options.getGroupNames();
+    console.log("groupNames: ");
+    console.log(groupNames);
     // Fetch title from bookmarks. XXX: Places API can be slow!
     var browserutils = new BrowserUtils();
     for(var i=1; i<groupNames.length; ++i) { // Exclude the default group
@@ -75,6 +77,7 @@ function load() {
     href = window.arguments ? window.arguments[0] : null;
     options = new PCManOptions();
     options.promise.then(function onFulfill() {
+        console.log("load options.promise.then");
         recentGroup = options.findGroup(href);
         loadObject();
         updattingSiteList = false;

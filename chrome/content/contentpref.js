@@ -29,6 +29,9 @@ PCManOptions.prototype = {
         var _this = this;
         var promise = new Promise(function(resolve, reject) {
             _this.prefService(false).then(function onFulfill() {  // read preferences
+                //console.log("current this.groups: ");
+                //console.log(_this.groups);
+                console.log("load prefService(false).then repair the default group");
                 // repair the default group
                 if(!_this.groups[0]) {
                     _this.copyGroup(0, null, '_override_');
@@ -49,6 +52,7 @@ PCManOptions.prototype = {
                     }
                 }
                 _this.setLoginInfo(true);
+                //console.log(_this.groups);
                 resolve();
             });
         });
@@ -59,6 +63,7 @@ PCManOptions.prototype = {
         this.setLoginInfo(false);
         var _this = this;
         this.prefService(true).then(function onFulfill() { // write preferences
+            console.log("save prefService(true).then");
             _this.setLoginInfo(true);
         });
     },
@@ -72,14 +77,17 @@ PCManOptions.prototype = {
 
     // Determine the group index by the url
     findGroup: function(url) {
-        if(!url) return 0;
+        if(!url) return -1;
         url = url.replace(/.*:\/\/([^\/]*).*/, '$1'); // Trim the protocol
+        //console.log("findGroup url: " + url);
         // search from the newest group
         for(var i=this.groups.length-1; i>=0; --i) {
-            if(url == this.getVal(i, 'Name', null))
+            if(url == this.getVal(i, 'Name', null)) {
+                //console.log("findGroup url: " + url + "; index: " + i);
                 return i;
+            }
         }
-        return 0; // Not found
+        return -1; // Not found
     },
 
     getVal: function(group, key, value) {
@@ -121,7 +129,7 @@ PCManOptions.prototype = {
     },
 
     // Remove the group
-    // For the default group, reset to the setupDefault 
+    // For the default group, reset to the setupDefault
     removeGroup: function(group) {
         if(group == 0)
             return this.copyGroup(0, null, '_override_');
@@ -137,7 +145,7 @@ PCManOptions.prototype = {
                                .getService(Components.interfaces.nsIContentPrefService2);
             var getURI = function(group) { // Only used in this function
                 if(group == _this.setupDefault.Name)
-                    return null;
+                    return "default";
                 try {
                     var uri = Components.classes['@mozilla.org/network/io-service;1']
                               .getService(Components.interfaces.nsIIOService)
@@ -147,36 +155,61 @@ PCManOptions.prototype = {
                     return null;
                 }
             };
-            var groupURIs = [null];
+            var groupURIs = [];
             prefService2.getByName('Name', null, {
                 handleResult: function(pref) {
-                    var groupName = pref.domain;
+//                    var groupName = pref.domain;
+                    var groupName = pref.value;
                     var uri = getURI(groupName);
-                    if(groupName && uri)
+                    //console.log("pref. domain: " + pref.domain + "; name: " + pref.name + "; val: " + pref.value);
+                    if(pref.domain && groupName && uri) {
                         groupURIs.push(uri);
+                        //console.log("push groupURIs: groupName: " + groupName + "; uri: " + uri);
+                    }
+                },
+                handleError: function (error) {
+                    console.log("prefService2.getByName error: " + error);
+                    reject();
                 },
                 handleCompletion: function() {
+                    //console.log("");
                     if(!isWrite) { // read
+                        var all_gets = [];
                         for(var i=0; i < groupURIs.length; ++i) {
                             if (groupURIs[i]) {
                                 for(var key in _this.setupDefault) {
-                                    prefService2.getByDomainAndName(groupURIs[i], key, null, {
-                                        handleResult: function(pref) {
-                                            _this.setVal(groupURIs.indexOf(pref.domain), pref.name, pref.value);
-                                            //console.log("i = " + groupURIs.indexOf(pref.domain) + "; key = " + pref.name + "; val = " + pref.value);
-                                        },
-                                        handleCompletion: function() {
-                                            resolve();
-                                        }
-                                    });
+                                    var getPrefPromise = function(domain, key) {
+                                        return new Promise(function(resolve, reject) {
+                                            //var domain = groupURIs[i];
+                                            prefService2.getByDomainAndName(domain, key, null, {
+                                                handleResult: function(pref) {
+                                                    _this.setVal(groupURIs.indexOf(pref.domain), pref.name, pref.value);
+                                                    console.log("read: i = " + groupURIs.indexOf(pref.domain) + "; key = " + pref.name + "; val = " + pref.value);
+                                                },
+                                                handleCompletion: function() {
+                                                    //console.log("domain: " + domain + " getByDomainAndName handleCompletion.");
+                                                    resolve();
+                                                }
+                                           });
+                                       });
+                                    }
+                                    all_gets.push(getPrefPromise(groupURIs[i], key));
                                 }
                             }
                         }
+                        Promise.all(all_gets).then(function onFulfill() {
+                            //console.log("all_gets promise then.");
+                            resolve();
+                        });
                     } else {  // write
+                        console.log(_this.groups);
                         for(var i=0; i < _this.groups.length; ++i) {
-                            if(groupURIs.join(', ').indexOf(_this.groups[i].Name) < 0)
+                            if(groupURIs.join(', ').indexOf(_this.groups[i].Name) < 0) {
+                                console.log("new group: " + _this.groups[i].Name);
                                 groupURIs.push(getURI(_this.groups[i].Name)); // new groups
+                            }
                         }
+                        console.log(groupURIs);
                         for(var i=0; i < groupURIs.length; ++i) {
                             if (groupURIs[i]) {
                                 for(var key in _this.setupDefault) {
@@ -184,7 +217,7 @@ PCManOptions.prototype = {
                                     if(_this.isFX3 && groupName)
                                         groupName = groupName.hostPort;
                                     var newVal = null;
-                                    if(!groupName || _this.findGroup(groupName)>0)
+                                    if(_this.findGroup(groupName) > -1)
                                         newVal = _this.getVal(_this.findGroup(groupName), key);
                                     var orgVal = prefService2.getCachedByDomainAndName(groupURIs[i], key, null);
                                     if(orgVal) {
@@ -194,12 +227,12 @@ PCManOptions.prototype = {
                                             prefService2.removeByDomainAndName(groupURIs[i], key, null);
                                         else {
                                             prefService2.set(groupURIs[i], key, newVal, null);
-                                            console.log("domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal + "; orgVal: " + orgVal.value);
+                                            console.log("write: domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal + "; orgVal: " + orgVal.value);
                                         }
                                     } else {
                                         if(newVal != null) {
                                             prefService2.set(groupURIs[i], key, newVal, null);
-                                            console.log("domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal);
+                                            console.log("write: domain: " + groupURIs[i] + "; key: " + key + "; newVal: " + newVal);
                                         }
                                     }
                                 }
